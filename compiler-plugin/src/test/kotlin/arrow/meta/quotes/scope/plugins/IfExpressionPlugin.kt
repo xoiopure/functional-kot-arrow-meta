@@ -20,9 +20,11 @@ val Meta.ifExpressionPlugin
         ifExpression({ true }) { expression ->
           Transform.replace(
             replacing = expression,
-            newDeclaration = """if ($condition) $`else`""".`if`  // {"""$then""".`if`} also works
+            newDeclaration = when {
+              `else`.value == null -> """if ($condition) $then""".`if`
+              else -> """if ($condition) $then else $`else`""".`if`
+            }
           )
         }
       )
     }
-
