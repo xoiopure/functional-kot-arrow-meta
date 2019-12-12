@@ -103,7 +103,7 @@ import org.jetbrains.kotlin.psi.psiUtil.visibilityModifierType
  * @param visibility is the class public, private, protected? etc.
  * @param kind denotes certain classes as sealed class types or data class types.
  */
-class ClassDeclaration(
+open class ClassDeclaration<out T: KtClass>(
   override val value: KtClass,
   val visibility: Name? = value.visibilityModifierType()?.value?.let(Name::identifier),
   val kind: Name? =
@@ -115,4 +115,4 @@ class ClassDeclaration(
   val `(typeParameters)`: ScopedList<KtTypeParameter> = ScopedList(prefix = "<", value = value.typeParameters, postfix = ">"),
   val `(params)`: ScopedList<KtParameter> = ScopedList(prefix = "public constructor (", value = value.getValueParameters(), postfix = ")"),
   val supertypes: ScopedList<KtSuperTypeListEntry> = ScopedList(value.superTypeListEntries)
-) : ClassOrObjectScope<KtClass>(value)
+) : ClassOrObject<KtClass>(value)

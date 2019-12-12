@@ -35,4 +35,4 @@ import org.jetbrains.kotlin.psi.KtObjectDeclaration
  */
 class ObjectDeclaration(
   override val value: KtObjectDeclaration
-): ClassOrObjectScope<KtObjectDeclaration>(value)
+): ClassOrObject<KtObjectDeclaration>(value)

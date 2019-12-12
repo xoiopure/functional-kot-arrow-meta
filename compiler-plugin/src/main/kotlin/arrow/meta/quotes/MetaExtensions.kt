@@ -4,6 +4,7 @@ import arrow.meta.Meta
 import arrow.meta.phases.ExtensionPhase
 import arrow.meta.quotes.classorobject.ClassBody
 import arrow.meta.quotes.classorobject.ClassDeclaration
+import arrow.meta.quotes.classorobject.EnumEntry
 import arrow.meta.quotes.classorobject.ObjectDeclaration
 import arrow.meta.quotes.declaration.DestructuringDeclaration
 import arrow.meta.quotes.element.CatchClause
@@ -41,6 +42,7 @@ import org.jetbrains.kotlin.psi.KtClassBody
 import org.jetbrains.kotlin.psi.KtContinueExpression
 import org.jetbrains.kotlin.psi.KtDestructuringDeclaration
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
+import org.jetbrains.kotlin.psi.KtEnumEntry
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtForExpression
 import org.jetbrains.kotlin.psi.KtFunctionLiteral
@@ -134,6 +136,15 @@ fun Meta.destructuringDeclaration(
   map: DestructuringDeclaration.(KtDestructuringDeclaration) -> Transform<KtDestructuringDeclaration>
 ): ExtensionPhase =
   quote(match, map) { DestructuringDeclaration(it) }
+
+/**
+ * @see [EnumEntry]
+ */
+fun Meta.enumEntry(
+  match: KtEnumEntry.() -> Boolean,
+  map: EnumEntry.(KtEnumEntry) -> Transform<KtEnumEntry>
+): ExtensionPhase =
+  quote(match, map) { EnumEntry(it) }
 
 /**
  * @see [File]

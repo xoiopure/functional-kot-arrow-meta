@@ -23,7 +23,7 @@ import org.jetbrains.kotlin.psi.psiUtil.modalityModifierType
  *
  * Parent scope of [KtClass] and [KtObjectDeclaration]
  */
-open class ClassOrObjectScope<out T : KtClassOrObject>(
+open class ClassOrObject<out T : KtClassOrObject>(
   override val value: T,
   val `@annotations`: ScopedList<KtAnnotationEntry> = ScopedList(value.annotationEntries),
   val modality: Name? = value.modalityModifierType()?.value?.let(Name::identifier),
@@ -37,8 +37,8 @@ open class ClassOrObjectScope<out T : KtClassOrObject>(
   val name: Name? = value.nameAsName
   ) : Scope<T>(value)
 
-fun <T: KtClassOrObject> ClassOrObjectScope<T>.getOrCreateBody(): Scope<KtClassBody> = Scope(value.getOrCreateBody())
+fun <T: KtClassOrObject> ClassOrObject<T>.getOrCreateBody(): Scope<KtClassBody> = Scope(value.getOrCreateBody())
 
-val <T: KtClassOrObject> ClassOrObjectScope<T>.allConstructors
+val <T: KtClassOrObject> ClassOrObject<T>.allConstructors
   get() = ScopedList(value.allConstructors)
 
