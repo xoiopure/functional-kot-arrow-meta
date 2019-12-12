@@ -1,7 +1,7 @@
 package arrow.meta.quotes.expression
 
 import arrow.meta.quotes.Scope
-import arrow.meta.quotes.modifierlist.TypeReference
+import arrow.meta.quotes.modifierlistowner.TypeReference
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtIsExpression
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression

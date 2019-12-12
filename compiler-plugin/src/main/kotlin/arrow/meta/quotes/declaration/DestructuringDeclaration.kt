@@ -20,17 +20,17 @@ import org.jetbrains.kotlin.psi.KtExpression
  * import arrow.meta.quotes.destructuringDeclaration
  *
  * val Meta.reformatDestructuringDeclaration: Plugin
- *  get() =
- *   "ReformatDestructuringDeclaration" {
- *    meta(
- *     destructuringDeclaration({ true }) { c ->
- *      Transform.replace(
- *       replacing = c,
- *       newDeclaration = """$valOrVar ($entries) = $initializer """.destructuringDeclaration
- *      )
- *     }
- *    )
- *   }
+ *    get() =
+ *      "Reformat Destructuring Declaration" {
+ *        meta(
+ *          destructuringDeclaration({ true }) { declaration ->
+ *            Transform.replace(
+ *              replacing = c,
+ *              newDeclaration = """$valOrVar ($entries) = $initializer """.destructuringDeclaration
+ *            )
+ *          }
+ *        )
+ *      }
  * ```
  */
 class DestructuringDeclaration(

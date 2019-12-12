@@ -2,9 +2,8 @@ package arrow.meta.quotes.expression
 
 import arrow.meta.quotes.Scope
 import arrow.meta.quotes.ScopedList
-import org.jetbrains.kotlin.psi.KtBlockExpression
+import arrow.meta.quotes.element.FinallySection
 import org.jetbrains.kotlin.psi.KtCatchClause
-import org.jetbrains.kotlin.psi.KtFinallySection
 import org.jetbrains.kotlin.psi.KtTryExpression
 
 /**
@@ -20,22 +19,22 @@ import org.jetbrains.kotlin.psi.KtTryExpression
  * import arrow.meta.quotes.tryExpression
  *
  * val Meta.reformatTry: Plugin
- *  get() =
- *   "ReformatTry" {
- *    meta(
- *     tryExpression({ true }) { e ->
- *      Transform.replace(
- *       replacing = e,
- *       newDeclaration = """try $tryBlock$catchClauses$finallySection""".`try`
+ *    get() =
+ *      "Reformat Try Expression" {
+ *        meta(
+ *          tryExpression({ true }) { expression ->
+ *            Transform.replace(
+ *            replacing = expression,
+ *            newDeclaration = """try $tryBlock$catchClauses$finallySection""".`try`
+ *          )
+ *        }
  *      )
- *      }
- *     )
  *    }
  * ```
  */
 class TryExpression(
   override val value: KtTryExpression?,
-  val tryBlock: Scope<KtBlockExpression> = Scope(value?.tryBlock),
+  val tryBlock: BlockExpression = BlockExpression(value?.tryBlock),
   val catchClauses: ScopedList<KtCatchClause> = ScopedList(value = value?.catchClauses.orEmpty()),
-  val finallySection: Scope<KtFinallySection> = Scope(value?.finallyBlock)
+  val finallySection: FinallySection = FinallySection(value?.finallyBlock)
 ) : Scope<KtTryExpression>(value)
