@@ -24,7 +24,7 @@ import org.jetbrains.kotlin.psi.KtTypeReference
  *        meta(
  *          typeReference({ true }) { modifierListOwner ->
  *            Transform.replace(
- *              replacing = modifierList,
+ *              replacing = modifierListOwner,
  *              newDeclaration = """$`@annotations` $typeElement""".type
  *            )
  *          }
