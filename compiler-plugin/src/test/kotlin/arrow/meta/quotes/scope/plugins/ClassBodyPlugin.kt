@@ -27,15 +27,25 @@ private val Meta.classBody
           Transform.replace(
             replacing = c,
             newDeclaration =
-            """
-            | {
-            |  $properties
-            |
-            |  $companionObjects
-            |
-            |  $functions
-            | }
-            """.classBody
+            if (enumEntries.toStringList().isEmpty()) {
+              """
+              | {
+              |  $properties
+              |
+              |  $companionObjects
+              |
+              |  $functions
+              | }
+              | """.classBody
+            } else {
+              """
+              | {
+              |  $enumEntries
+              |
+              |  $functions
+              | }
+              | """.classBody
+            }
           )
         }
       )

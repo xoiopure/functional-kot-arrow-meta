@@ -1,20 +1,18 @@
 package arrow.meta.quotes.scope
 
-import arrow.meta.Meta
 import arrow.meta.plugin.testing.Code
 import arrow.meta.plugin.testing.CompilerTest
 import arrow.meta.plugin.testing.CompilerTest.Companion.source
 import arrow.meta.plugin.testing.assertThis
 import arrow.meta.quotes.scope.plugins.ClassBodyPlugin
-import arrow.meta.quotes.scope.plugins.EnumBodyPlugin
 import io.kotlintest.specs.AnnotationSpec
 
 class ClassBodyTest : AnnotationSpec() {
 
   @Test
   fun `Validate class body scope properties`() {
-      validate(ClassBodyPlugin(), """
-        | // metadebug
+      validate("""
+        | //metadebug
         | 
         | class ClassBodyScopeTest {
         |
@@ -36,8 +34,8 @@ class ClassBodyTest : AnnotationSpec() {
   
   @Test
   fun `Validate enum body scope properties`() {
-    validate(EnumBodyPlugin(), """
-      | // metadebug
+    validate("""
+      | //metadebug
       | 
       | enum class EnumBodyScopeTest {
       |   FOO, BAR;
@@ -50,8 +48,8 @@ class ClassBodyTest : AnnotationSpec() {
   
   @Test
   fun `Validate object body scope properties`() {
-    validate(ClassBodyPlugin(), """
-      | // metadebug
+    validate("""
+      | //metadebug
       |
       | object ObjectBodyScopeTest {
       |   private val x = "x"
@@ -66,9 +64,9 @@ class ClassBodyTest : AnnotationSpec() {
       | """.source)
   }
 
-  private fun validate(plugin: Meta, source: Code.Source) {
+  private fun validate(source: Code.Source) {
     assertThis(CompilerTest(
-      config = { listOf(addMetaPlugins(plugin)) },
+      config = { listOf(addMetaPlugins(ClassBodyPlugin())) },
       code = { source },
       assert = { quoteOutputMatches(source) }
     ))
