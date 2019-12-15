@@ -54,11 +54,3 @@ class IfExpressionTest : AnnotationSpec() {
       | """.source
   }
 }
-
-class Wrapper {
-  fun whatever() {
-    if (2 == 3) {
-      println("FAKE NEWS")
-    }
-  }
-}

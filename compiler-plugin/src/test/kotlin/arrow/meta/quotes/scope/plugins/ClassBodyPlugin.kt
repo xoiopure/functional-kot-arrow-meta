@@ -34,8 +34,6 @@ private val Meta.classBody
             |  $companionObjects
             |
             |  $functions
-            |
-            |  fun test() = 0
             | }
             """.classBody
           )
@@ -56,8 +54,6 @@ private val Meta.enumBody
             |  $enumEntries
             |
             |  $functions
-            |
-            |  fun test() = 0
             | }
             """.classBody
           )
