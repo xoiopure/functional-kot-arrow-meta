@@ -3,6 +3,7 @@ package arrow.meta.quotes.scope
 import arrow.meta.plugin.testing.CompilerTest
 import arrow.meta.plugin.testing.CompilerTest.Companion.source
 import arrow.meta.plugin.testing.assertThis
+import arrow.meta.quotes.scope.plugins.FinallySectionPlugin
 import io.kotlintest.specs.AnnotationSpec
 
 // TODO implement convertFinally in Converter to support FINALLY in AST
@@ -28,7 +29,7 @@ class FinallySectionTest : AnnotationSpec() {
   @Test
   fun `Validate finally section scope properties`() {
     assertThis(CompilerTest(
-      config = { listOf(addMetaPlugins()) },  // TODO create a scope plugin for finally section
+      config = { listOf(addMetaPlugins(FinallySectionPlugin())) },
       code = { finallySection },
       assert = { quoteOutputMatches(finallySection) }
     ))
