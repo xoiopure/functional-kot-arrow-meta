@@ -1,7 +1,6 @@
 // Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
-package com.intellij.openapi.externalSystem.test;
+package external.forks.jb.gradle;
 
-import com.intellij.compiler.artifacts.ArtifactsTestUtil;
 import com.intellij.compiler.impl.ModuleCompileScope;
 import com.intellij.compiler.server.BuildManager;
 import com.intellij.openapi.application.ApplicationManager;
@@ -38,16 +37,18 @@ import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.ExceptionUtil;
 import com.intellij.util.PathUtil;
 import com.intellij.util.SmartList;
+import com.intellij.util.concurrency.Semaphore;
 import com.intellij.util.io.PathKt;
 import com.intellij.util.io.TestFileSystemItem;
+import com.intellij.util.ui.UIUtil;
 import gnu.trove.THashSet;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.SystemIndependent;
-import org.jetbrains.concurrency.Promise;
 import org.junit.After;
 import org.junit.Before;
 
+import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -58,7 +59,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.*;
-import java.util.function.BiPredicate;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -68,11 +68,6 @@ import java.util.jar.Manifest;
  * @author Vladislav.Soroka
  */
 public abstract class ExternalSystemTestCase extends UsefulTestCase {
-
-  private static final BiPredicate<Object, Object> EQUALS_PREDICATE = (t, u) -> Objects.equals(t, u);
-
-  private File ourTempDir;
-
   protected IdeaProjectTestFixture myTestFixture;
   protected Project myProject;
   protected File myTestDir;
@@ -80,6 +75,7 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
   protected VirtualFile myProjectConfig;
   protected List<VirtualFile> myAllConfigs = new ArrayList<>();
   protected boolean useProjectTaskManager;
+  private File ourTempDir;
 
   @Before
   @Override
@@ -118,24 +114,6 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
   protected void collectAllowedRoots(List<String> roots) {
   }
 
-  public static Collection<String> collectRootsInside(String root) {
-    final List<String> roots = new SmartList<>();
-    roots.add(root);
-    FileUtil.processFilesRecursively(new File(root), file -> {
-      try {
-        String path = file.getCanonicalPath();
-        if (!FileUtil.isAncestor(path, path, false)) {
-          roots.add(path);
-        }
-      }
-      catch (IOException ignore) {
-      }
-      return true;
-    });
-
-    return roots;
-  }
-
   private void ensureTempDirCreated() throws IOException {
     if (ourTempDir != null) return;
 
@@ -147,7 +125,8 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
   protected abstract String getTestsTempDir();
 
   protected void setUpFixtures() throws Exception {
-    myTestFixture = IdeaTestFixtureFactory.getFixtureFactory().createFixtureBuilder(getName(), useDirectoryBasedStorageFormat()).getFixture();
+    myTestFixture =
+      IdeaTestFixtureFactory.getFixtureFactory().createFixtureBuilder(getName(), useDirectoryBasedStorageFormat()).getFixture();
     myTestFixture.setUp();
   }
 
@@ -249,17 +228,6 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     return false;
   }
 
-  protected static String getRoot() {
-    if (SystemInfo.isWindows) return "c:";
-    return "";
-  }
-
-  protected static String getEnvVar() {
-    if (SystemInfo.isWindows) return "TEMP";
-    else if (SystemInfo.isLinux) return "HOME";
-    return "TMPDIR";
-  }
-
   protected String getProjectPath() {
     return myProjectRoot.getPath();
   }
@@ -303,11 +271,11 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     final String configFileName = getExternalSystemConfigFileName();
     VirtualFile configFile;
     try {
-        configFile = WriteAction.computeAndWait(() -> {
-          VirtualFile file = dir.findChild(configFileName);
-          return file == null ? dir.createChildData(null, configFileName) : file;
-        });
-        myAllConfigs.add(configFile);
+      configFile = WriteAction.computeAndWait(() -> {
+        VirtualFile file = dir.findChild(configFileName);
+        return file == null ? dir.createChildData(null, configFileName) : file;
+      });
+      myAllConfigs.add(configFile);
     }
     catch (IOException e) {
       throw new RuntimeException(e);
@@ -374,19 +342,11 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     return jarFile;
   }
 
-  private static void addJarEntry(byte[] bytes, String path, JarOutputStream target) throws IOException {
-    JarEntry entry = new JarEntry(path.replace("\\", "/"));
-    target.putNextEntry(entry);
-    target.write(bytes);
-    target.close();
-  }
-
   protected VirtualFile createProjectSubFile(String relativePath, String content) throws IOException {
     VirtualFile file = createProjectSubFile(relativePath);
     setFileContent(file, content, false);
     return file;
   }
-
 
   protected void compileModules(final String... moduleNames) {
     if (useProjectTaskManager) {
@@ -409,18 +369,27 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     }
   }
 
-  private void build(Object[] buildableElements) {
-    Promise<ProjectTaskManager.Result> promise;
+  private void build(@NotNull Object[] buildableElements) {
+    final Semaphore semaphore = new Semaphore();
+    semaphore.down();
     if (buildableElements instanceof Module[]) {
-      promise = ProjectTaskManager.getInstance(myProject).build((Module[])buildableElements);
+      ProjectTaskManager.getInstance(myProject)
+        .build((Module[])buildableElements)
+        .onProcessed(result -> semaphore.up());
     }
     else if (buildableElements instanceof Artifact[]) {
-      promise = ProjectTaskManager.getInstance(myProject).build((Artifact[])buildableElements);
+      ProjectTaskManager.getInstance(myProject)
+        .build((Artifact[])buildableElements)
+        .onProcessed(result -> semaphore.up());
     }
     else {
-      throw new AssertionError("Unsupported buildableElements: " + Arrays.toString(buildableElements));
+      assert false : "Unsupported buildableElements: " + Arrays.toString(buildableElements);
     }
-    edt(() -> PlatformTestUtil.waitForPromise(promise));
+    while (!semaphore.waitFor(100)) {
+      if (SwingUtilities.isEventDispatchThread()) {
+        UIUtil.dispatchAllInvocationEvents();
+      }
+    }
   }
 
   private void compile(@NotNull CompileScope scope) {
@@ -452,7 +421,6 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     }
   }
 
-
   private CompileScope createModulesCompileScope(final String[] moduleNames) {
     final List<Module> modules = new ArrayList<>();
     for (String name : moduleNames) {
@@ -473,10 +441,6 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     final Sdk sdk = true ? JavaAwareProjectJdkTableImpl.getInstanceEx().getInternalJdk() : createJdk();
     ModuleRootModificationUtil.setModuleSdk(getModule(moduleName), sdk);
     return sdk;
-  }
-
-  protected static Sdk createJdk() {
-    return IdeaTestUtil.getMockJdk17();
   }
 
   protected Module getModule(final String name) {
@@ -512,6 +476,62 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     final File file = new File(outputFile);
     assert file.exists();
     fs.assertFileEqual(file);
+  }
+
+  protected boolean ignore() {
+    printIgnoredMessage(null);
+    return true;
+  }
+
+  private void printIgnoredMessage(String message) {
+    String toPrint = "Ignored";
+    if (message != null) {
+      toPrint += ", because " + message;
+    }
+    toPrint += ": " + getClass().getSimpleName() + "." + getName();
+    System.out.println(toPrint);
+  }
+
+  public static Collection<String> collectRootsInside(String root) {
+    final List<String> roots = new SmartList<>();
+    roots.add(root);
+    FileUtil.processFilesRecursively(new File(root), file -> {
+      try {
+        String path = file.getCanonicalPath();
+        if (!FileUtil.isAncestor(path, path, false)) {
+          roots.add(path);
+        }
+      }
+      catch (IOException ignore) {
+      }
+      return true;
+    });
+
+    return roots;
+  }
+
+  protected static String getRoot() {
+    if (SystemInfo.isWindows) return "c:";
+    return "";
+  }
+
+  protected static String getEnvVar() {
+    if (SystemInfo.isWindows) {
+      return "TEMP";
+    }
+    else if (SystemInfo.isLinux) return "HOME";
+    return "TMPDIR";
+  }
+
+  private static void addJarEntry(byte[] bytes, String path, JarOutputStream target) throws IOException {
+    JarEntry entry = new JarEntry(path.replace("\\", "/"));
+    target.putNextEntry(entry);
+    target.write(bytes);
+    target.close();
+  }
+
+  protected static Sdk createJdk() {
+    return IdeaTestUtil.getMockJdk17();
   }
 
   protected static void setFileContent(final VirtualFile file, final String content, final boolean advanceStamps) {
@@ -552,10 +572,6 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
   }
 
   protected static <T, U> void assertOrderedElementsAreEqual(Collection<U> actual, T... expected) {
-    assertOrderedElementsAreEqual(equalsPredicate(), actual, expected);
-  }
-
-  protected static <T, U> void assertOrderedElementsAreEqual(BiPredicate<U, T> predicate, Collection<U> actual, T... expected) {
     String s = "\nexpected: " + Arrays.asList(expected) + "\nactual: " + new ArrayList<>(actual);
     assertEquals(s, expected.length, actual.size());
 
@@ -563,7 +579,7 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     for (int i = 0; i < expected.length; i++) {
       T expectedElement = expected[i];
       U actualElement = actualList.get(i);
-      assertTrue(s, predicate.test(actualElement, expectedElement));
+      assertEquals(s, expectedElement, actualElement);
     }
   }
 
@@ -576,16 +592,6 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     List<T> actualCopy = new ArrayList<>(actual);
     actualCopy.removeAll(Arrays.asList(expected));
     assertEquals(actual.toString(), actualCopy.size(), actual.size());
-  }
-
-  protected boolean ignore() {
-    printIgnoredMessage(null);
-    return true;
-  }
-
-  protected static <T, U> BiPredicate<T, U> equalsPredicate() {
-    //noinspection unchecked
-    return (BiPredicate<T, U>)EQUALS_PREDICATE;
   }
 
   public static void deleteBuildSystemDirectory() {
@@ -604,15 +610,6 @@ public abstract class ExternalSystemTestCase extends UsefulTestCase {
     catch (Exception e) {
       LOG.warn("Unable to remove build system directory.", e);
     }
-  }
-
-  private void printIgnoredMessage(String message) {
-    String toPrint = "Ignored";
-    if (message != null) {
-      toPrint += ", because " + message;
-    }
-    toPrint += ": " + getClass().getSimpleName() + "." + getName();
-    System.out.println(toPrint);
   }
 
   private static class SetWithToString<T> extends AbstractSet<T> {
