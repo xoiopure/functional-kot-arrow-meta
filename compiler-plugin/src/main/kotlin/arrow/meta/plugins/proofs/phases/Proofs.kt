@@ -126,6 +126,7 @@ fun Proof.callables(descriptorNameFilter: (Name) -> Boolean = { true }): List<Ca
     .toList()
     .filterIsInstance<CallableMemberDescriptor>()
     .mapNotNull(CallableMemberDescriptor::discardPlatformBaseObjectFakeOverrides)
+    //.mapNotNull { it.newCopyBuilder().setC.build() }
 
 fun CompilerContext.extensionProof(subType: KotlinType, superType: KotlinType): Proof? =
   extensionProofs(subType, superType).firstOrNull()

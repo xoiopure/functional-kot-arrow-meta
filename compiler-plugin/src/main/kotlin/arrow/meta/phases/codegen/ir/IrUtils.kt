@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
+import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
@@ -184,6 +185,9 @@ val IrCall.typeArguments: List<Pair<Int, IrType?>>
 
 val IrCall.unsubstitutedDescriptor: FunctionDescriptor
   get() = symbol.owner.descriptor
+
+val IrCall.substitutedValueParameters: List<Pair<ValueParameterDescriptor, KotlinType>>
+  get() = unsubstitutedDescriptor.substitutedValueParameters(this)
 
 /**
  * returns a Pair of the descriptor and it's substituted KotlinType at the call-site

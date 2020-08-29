@@ -5,6 +5,7 @@ import arrow.meta.log.invoke
 import arrow.meta.phases.CompilerContext
 import arrow.meta.phases.codegen.ir.IrUtils
 import arrow.meta.phases.codegen.ir.dfsCalls
+import arrow.meta.phases.codegen.ir.substitutedValueParameters
 import arrow.meta.phases.codegen.ir.unsubstitutedDescriptor
 import arrow.meta.phases.resolve.baseLineTypeChecker
 import arrow.meta.phases.resolve.typeArgumentsMap
@@ -16,6 +17,7 @@ import arrow.meta.plugins.proofs.phases.RefinementProof
 import arrow.meta.plugins.proofs.phases.extensionProofs
 import arrow.meta.plugins.proofs.phases.givenProofs
 import arrow.meta.plugins.proofs.phases.resolve.GivenUpperBound
+import org.jetbrains.kotlin.backend.common.ir.setDeclarationsParent
 import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
@@ -157,7 +159,7 @@ class ProofsIrCodegen(
 
   private fun CompilerContext.proveCall(expression: IrCall): IrCall =
     Log.Verbose({ "insertProof:\n ${expression.dump()} \nresult\n ${this.dump()}" }) {
-      val givenTypeParamUpperBound = GivenUpperBound(expression.unsubstitutedDescriptor, expression)
+      val givenTypeParamUpperBound = GivenUpperBound(expression)
       val upperBound = givenTypeParamUpperBound.givenUpperBound
       if (upperBound != null) insertGivenCall(givenTypeParamUpperBound, expression)
       else insertExtensionSyntaxCall(expression)
@@ -169,35 +171,32 @@ class ProofsIrCodegen(
       ?: expression.extensionReceiver?.type?.toKotlinType()
       ?: (if (expression.valueArgumentsCount > 0) expression.getValueArgument(0)?.type?.toKotlinType() else null)
     val targetType =
-      (expression.symbol.owner.descriptor.dispatchReceiverParameter?.containingDeclaration as? FunctionDescriptor)?.dispatchReceiverParameter?.type
-        ?: expression.symbol.owner.descriptor.extensionReceiverParameter?.type
-        ?: expression.symbol.owner.descriptor.valueParameters.firstOrNull()?.type
+      (expression.unsubstitutedDescriptor.dispatchReceiverParameter?.containingDeclaration as? FunctionDescriptor)?.dispatchReceiverParameter?.type
+        ?: expression.unsubstitutedDescriptor.extensionReceiverParameter?.type
+        ?: expression.substitutedValueParameters.firstOrNull()?.second
     if (targetType != null && valueType != null && targetType != valueType && !baseLineTypeChecker.isSubtypeOf(valueType, targetType)) {
       expression.apply {
         val proofCall = extensionProofCall(valueType, targetType)
         if (proofCall is IrMemberAccessExpression) {
           when {
-            this.dispatchReceiver != null -> {
-              proofCall.extensionReceiver = this.dispatchReceiver
-              proofCall.also {
-                dispatchReceiver = it
-                extensionReceiver = null
-              }
+            dispatchReceiver != null -> {
+              proofCall.extensionReceiver = dispatchReceiver
+              dispatchReceiver = proofCall
+              //proofCall.setDeclarationsParent(expression.origin)
+              //extensionReceiver = null
             }
-            this.extensionReceiver != null -> {
-              proofCall.extensionReceiver = this.extensionReceiver
-              proofCall.also {
-                dispatchReceiver = null
-                extensionReceiver = it
-              }
+            extensionReceiver != null -> {
+              proofCall.extensionReceiver = extensionReceiver
+              dispatchReceiver = null
+              extensionReceiver = proofCall
             }
             (valueType != targetType && expression.valueArgumentsCount > 0) -> {
               dispatchReceiver = null
 
-              expression.mapValueParametersIndexed { n: Int, v: ValueParameterDescriptor ->
+              expression.mapValueParametersIndexed { n: Int, _->
                 val valueArgument = expression.getValueArgument(n)
                 val valueType2 = valueArgument?.type?.toKotlinType()!!
-                val targetType2 = expression.symbol.owner.descriptor.valueParameters[n].type
+                val targetType2 = expression.substitutedValueParameters[n].second
                 val proofCall2 = extensionProofCall(valueType2, targetType2) as? IrMemberAccessExpression
                 if (proofCall2 != null) {
                   proofCall2.extensionReceiver = valueArgument

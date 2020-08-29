@@ -19,14 +19,15 @@ import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.descriptors.SimpleFunctionDescriptor
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.ReceiverParameterDescriptorImpl
 import org.jetbrains.kotlin.incremental.components.LookupLocation
+import org.jetbrains.kotlin.ir.descriptors.WrappedDeclarationDescriptor
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.calls.inference.substitute
 import org.jetbrains.kotlin.resolve.descriptorUtil.builtIns
 import org.jetbrains.kotlin.resolve.descriptorUtil.isExtension
-import org.jetbrains.kotlin.resolve.scopes.ResolutionScope
 import org.jetbrains.kotlin.resolve.scopes.SyntheticScope
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
@@ -56,12 +57,17 @@ fun CompilerContext.syntheticMemberFunctions(receiverTypes: Collection<KotlinTyp
                 setPreserveSourceElement()
                 setDispatchReceiverParameter(dispatchReceiver).setDropOriginalInContainingParts()
                   .setOriginal(it)
+                  //.setOwner(it.containingDeclaration)
               }
           val result = resultingFunction?.createCustomCopy {
             setPreserveSourceElement()
             setDispatchReceiverParameter(ReceiverParameterDescriptorImpl(resultingFunction, ProofReceiverValue(receiverType), Annotations.EMPTY))
           }
-          result
+          result.apply {
+            /*assert(result?.let(::isOriginalDescriptor) == true && result.containingDeclaration.let(::isOriginalDescriptor)) {
+              "$result does not  qualify to pass  Ir Invariant for SyntheticMembers"
+            }*/
+          }
         }.filterIsInstance<SimpleFunctionDescriptor>()
       }
   }
@@ -169,3 +175,12 @@ fun Meta.provenSyntheticScope(): ExtensionPhase =
       }
     }
   )
+
+/**
+ * invariant in org.jetbrains.kotlin.ir.symbols.impl.IrBindableSymbolBase
+ */
+fun isOriginalDescriptor(descriptor: DeclarationDescriptor): Boolean =
+  descriptor is WrappedDeclarationDescriptor<*> ||
+    // TODO fix declaring/referencing value parameters: compute proper original descriptor
+    descriptor is ValueParameterDescriptor && isOriginalDescriptor(descriptor.containingDeclaration) ||
+    descriptor == descriptor.original
