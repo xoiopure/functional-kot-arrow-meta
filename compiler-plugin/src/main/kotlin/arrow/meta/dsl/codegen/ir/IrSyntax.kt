@@ -238,7 +238,7 @@ interface IrSyntax {
       }, Unit)
     }
 
-  fun irValueParameter(f: IrUtils.(IrValueParameter) -> IrStatement?): IRGeneration =
+  fun irValueParameter(f: IrUtils.(IrValueParameter) -> IrValueParameter?): IRGeneration =
     IrGeneration { compilerContext, file, pluginContext ->
       file.transformChildren(object : IrElementTransformer<Unit> {
         override fun visitValueParameter(expression: IrValueParameter, data: Unit): IrStatement =

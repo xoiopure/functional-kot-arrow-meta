@@ -5,6 +5,7 @@ import arrow.meta.log.Log
 import arrow.meta.log.invoke
 import arrow.meta.phases.CompilerContext
 import arrow.meta.phases.ExtensionPhase
+import arrow.meta.phases.codegen.ir.receiverParameter
 import arrow.meta.phases.resolve.unwrappedNotNullableType
 import arrow.meta.plugins.proofs.phases.callables
 import arrow.meta.plugins.proofs.phases.extending
@@ -18,10 +19,9 @@ import org.jetbrains.kotlin.descriptors.ConstructorDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
 import org.jetbrains.kotlin.descriptors.SimpleFunctionDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
-import org.jetbrains.kotlin.descriptors.annotations.Annotations
-import org.jetbrains.kotlin.descriptors.impl.ReceiverParameterDescriptorImpl
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.ir.descriptors.WrappedDeclarationDescriptor
 import org.jetbrains.kotlin.name.Name
@@ -50,27 +50,30 @@ fun CompilerContext.syntheticMemberFunctions(receiverTypes: Collection<KotlinTyp
           ).typeSubstitutor
           val targetType = substitutor.safeSubstitute(proof.to.unwrap())
           val receiver = ProofReceiverValue(targetType)
-          val dispatchReceiver = ReceiverParameterDescriptorImpl(it, receiver, Annotations.EMPTY).substitute(substitutor) as ReceiverParameterDescriptorImpl
+          val dispatcher = receiverParameter(receiver, it, sourceElement = it.source, annotations = it.annotations).substitute(substitutor) as ReceiverParameterDescriptor
           val resultingFunction =
             it.substitute(substitutor).safeAs<SimpleFunctionDescriptor>()
               ?.createCustomCopy {
                 setPreserveSourceElement()
-                setDispatchReceiverParameter(dispatchReceiver).setDropOriginalInContainingParts()
+                setDispatchReceiverParameter(dispatcher).setDropOriginalInContainingParts()
                   .setOriginal(it)
-                  //.setOwner(it.containingDeclaration)
               }
           val result = resultingFunction?.createCustomCopy {
             setPreserveSourceElement()
-            setDispatchReceiverParameter(ReceiverParameterDescriptorImpl(resultingFunction, ProofReceiverValue(receiverType), Annotations.EMPTY))
+            setDispatchReceiverParameter(receiverParameter(ProofReceiverValue(receiverType), resultingFunction, sourceElement = resultingFunction.source))
           }
-          result.apply {
-            /*assert(result?.let(::isOriginalDescriptor) == true && result.containingDeclaration.let(::isOriginalDescriptor)) {
-              "$result does not  qualify to pass  Ir Invariant for SyntheticMembers"
-            }*/
-          }
+          result
         }.filterIsInstance<SimpleFunctionDescriptor>()
       }
   }
+
+/*fun WrappedCallableDescriptor<*>.substituteW(substitutor: NewTypeSubstitutor): WrappedCallableDescriptor<*> {
+  val wrappedSubstitution = object : TypeSubstitution() {
+    override fun get(key: KotlinType): TypeProjection? = null
+    override fun prepareTopLevelType(topLevelType: KotlinType, position: Variance) = substitutor.safeSubstitute(topLevelType.unwrap())
+  }
+  return substitute(TypeSubstitutor.create(wrappedSubstitution))
+}*/
 
 class ProofsSyntheticScope(private val ctx: CompilerContext) : SyntheticScope {
   override fun getSyntheticConstructor(constructor: ConstructorDescriptor): ConstructorDescriptor? =

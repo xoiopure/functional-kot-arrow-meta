@@ -47,7 +47,7 @@ class TypeClassesTest {
         //val result1 = 
         //val result2 = "1".combine("1")
         //val result3 = "2".mappend("2")
-        val result = String.empty() //result1.combine(result2).combine(result3)
+        val result = String.empty()  //result1.combine(result2).combine(result3)
       """
     assertThis(CompilerTest(
       config = {

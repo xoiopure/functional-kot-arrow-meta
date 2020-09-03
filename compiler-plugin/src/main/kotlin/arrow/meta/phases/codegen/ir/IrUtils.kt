@@ -6,12 +6,18 @@ import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.CallableMemberDescriptor
 import org.jetbrains.kotlin.descriptors.ClassConstructorDescriptor
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
+import org.jetbrains.kotlin.descriptors.ReceiverParameterDescriptor
+import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
+import org.jetbrains.kotlin.descriptors.annotations.Annotations
+import org.jetbrains.kotlin.descriptors.impl.ReceiverParameterDescriptorImpl
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
-import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
+import org.jetbrains.kotlin.ir.descriptors.WrappedReceiverParameterDescriptor
+import org.jetbrains.kotlin.ir.descriptors.WrappedSimpleFunctionDescriptor
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
@@ -30,7 +36,9 @@ import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
 import org.jetbrains.kotlin.resolve.calls.inference.components.NewTypeSubstitutorByConstructorMap
 import org.jetbrains.kotlin.resolve.calls.util.FakeCallableDescriptorForObject
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
+import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.TypeSubstitutor
 import org.jetbrains.kotlin.types.asSimpleType
 import org.jetbrains.kotlin.types.typeUtil.isTypeParameter
 
@@ -142,7 +150,6 @@ class IrUtils(
       }
       newType?.value?.let(typeTranslator::translateType)
     }
-
 }
 
 fun IrCall.dfsCalls(): List<IrCall> {
@@ -204,3 +211,30 @@ fun CallableMemberDescriptor.substitutedValueParameters(call: IrCall): List<Pair
           } ?: type // Could not resolve the substituted KotlinType
         )
     }
+
+fun receiverParameter(
+  value: ReceiverValue,
+  descriptor: DeclarationDescriptor,
+  annotations: Annotations = Annotations.EMPTY,
+  sourceElement: SourceElement = SourceElement.NO_SOURCE
+): WrappedReceiverParameterDescriptor =
+  object : WrappedReceiverParameterDescriptor(annotations, sourceElement) {
+    override fun getValue(): ReceiverValue =
+      value
+
+    override fun getContainingDeclaration(): DeclarationDescriptor =
+      descriptor
+
+    override fun substitute(substitutor: TypeSubstitutor): ReceiverParameterDescriptor =
+      ReceiverParameterDescriptorImpl(descriptor, value, annotations).substitute(substitutor) as ReceiverParameterDescriptor
+  }
+
+fun simpleFunction(
+  f: FunctionDescriptor
+) =
+  object : WrappedSimpleFunctionDescriptor(f) {
+    override fun getContainingDeclaration(): DeclarationDescriptor =
+      f.containingDeclaration
+  }.apply {
+
+  }

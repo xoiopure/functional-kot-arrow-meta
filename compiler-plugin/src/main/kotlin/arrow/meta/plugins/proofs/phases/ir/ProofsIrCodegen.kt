@@ -17,12 +17,13 @@ import arrow.meta.plugins.proofs.phases.RefinementProof
 import arrow.meta.plugins.proofs.phases.extensionProofs
 import arrow.meta.plugins.proofs.phases.givenProofs
 import arrow.meta.plugins.proofs.phases.resolve.GivenUpperBound
-import org.jetbrains.kotlin.backend.common.ir.setDeclarationsParent
+import org.jetbrains.kotlin.backend.common.ir.ir2string
 import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
-import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
+import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrProperty
+import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
@@ -193,7 +194,7 @@ class ProofsIrCodegen(
             (valueType != targetType && expression.valueArgumentsCount > 0) -> {
               dispatchReceiver = null
 
-              expression.mapValueParametersIndexed { n: Int, _->
+              expression.mapValueParametersIndexed { n: Int, _ ->
                 val valueArgument = expression.getValueArgument(n)
                 val valueType2 = valueArgument?.type?.toKotlinType()!!
                 val targetType2 = expression.substitutedValueParameters[n].second
@@ -277,6 +278,18 @@ class ProofsIrCodegen(
       }
     } else it
   }
+
+  fun CompilerContext.proveSyntheticFunctions(f: IrValueParameter): IrValueParameter? =
+    f.apply {
+      println(ir2string(this))
+
+    }
+
+  fun CompilerContext.proveSyntheticAccess(f: IrFunction): IrFunction? =
+    f.apply {
+      println("\n \n PROOOF")
+      println(ir2string(this))
+    }
 
   companion object {
     operator fun <A> invoke(irUtils: IrUtils, f: ProofsIrCodegen.() -> A): A =
