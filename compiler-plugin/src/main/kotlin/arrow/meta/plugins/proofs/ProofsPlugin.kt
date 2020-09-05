@@ -31,8 +31,6 @@ val Meta.typeProofs: CliPlugin
         suppressDiagnostic { ctx.suppressProvenTypeMismatch(it) },
         suppressDiagnostic { ctx.suppressConstantExpectedTypeMismatch(it) },
         suppressDiagnostic { ctx.suppressTypeInferenceExpectedTypeMismatch(it) },
-        //irValueParameter { ProofsIrCodegen(this) { proveSyntheticFunctions(it)} },
-        //irFunction { ProofsIrCodegen(this) { proveSyntheticAccess(it)} },
         irTypeOperator { ProofsIrCodegen(this) { proveTypeOperator(it) } },
         irCall { ProofsIrCodegen(this) { proveNestedCalls(it) } },
         irProperty { ProofsIrCodegen(this) { proveProperty(it) } },

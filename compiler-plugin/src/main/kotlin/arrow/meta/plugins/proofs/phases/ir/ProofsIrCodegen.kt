@@ -6,6 +6,8 @@ import arrow.meta.phases.CompilerContext
 import arrow.meta.phases.codegen.ir.IrUtils
 import arrow.meta.phases.codegen.ir.dfsCalls
 import arrow.meta.phases.codegen.ir.substitutedValueParameters
+import arrow.meta.phases.codegen.ir.transformMe
+import arrow.meta.phases.codegen.ir.transformer
 import arrow.meta.phases.codegen.ir.unsubstitutedDescriptor
 import arrow.meta.phases.resolve.baseLineTypeChecker
 import arrow.meta.phases.resolve.typeArgumentsMap
@@ -17,14 +19,14 @@ import arrow.meta.plugins.proofs.phases.RefinementProof
 import arrow.meta.plugins.proofs.phases.extensionProofs
 import arrow.meta.plugins.proofs.phases.givenProofs
 import arrow.meta.plugins.proofs.phases.resolve.GivenUpperBound
-import org.jetbrains.kotlin.backend.common.ir.ir2string
 import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
-import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.IrVariable
+import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionImpl
+import org.jetbrains.kotlin.ir.descriptors.WrappedSimpleFunctionDescriptor
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrMemberAccessExpression
@@ -34,9 +36,11 @@ import org.jetbrains.kotlin.ir.expressions.getValueArgument
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
 import org.jetbrains.kotlin.ir.expressions.mapValueParametersIndexed
 import org.jetbrains.kotlin.ir.expressions.putValueArgument
+import org.jetbrains.kotlin.ir.symbols.impl.IrSimpleFunctionSymbolImpl
 import org.jetbrains.kotlin.ir.types.impl.originalKotlinType
 import org.jetbrains.kotlin.ir.types.toKotlinType
 import org.jetbrains.kotlin.ir.util.dump
+import org.jetbrains.kotlin.ir.util.irCall
 import org.jetbrains.kotlin.resolve.calls.inference.components.NewTypeSubstitutorByConstructorMap
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.types.KotlinType
@@ -164,10 +168,9 @@ class ProofsIrCodegen(
       val upperBound = givenTypeParamUpperBound.givenUpperBound
       if (upperBound != null) insertGivenCall(givenTypeParamUpperBound, expression)
       else insertExtensionSyntaxCall(expression)
-      expression
     }
 
-  private fun CompilerContext.insertExtensionSyntaxCall(expression: IrCall) {
+  private fun CompilerContext.insertExtensionSyntaxCall(expression: IrCall): IrCall {
     val valueType = expression.dispatchReceiver?.type?.toKotlinType()
       ?: expression.extensionReceiver?.type?.toKotlinType()
       ?: (if (expression.valueArgumentsCount > 0) expression.getValueArgument(0)?.type?.toKotlinType() else null)
@@ -176,15 +179,13 @@ class ProofsIrCodegen(
         ?: expression.unsubstitutedDescriptor.extensionReceiverParameter?.type
         ?: expression.substitutedValueParameters.firstOrNull()?.second
     if (targetType != null && valueType != null && targetType != valueType && !baseLineTypeChecker.isSubtypeOf(valueType, targetType)) {
-      expression.apply {
+      return expression.run {
         val proofCall = extensionProofCall(valueType, targetType)
         if (proofCall is IrMemberAccessExpression) {
           when {
             dispatchReceiver != null -> {
               proofCall.extensionReceiver = dispatchReceiver
               dispatchReceiver = proofCall
-              //proofCall.setDeclarationsParent(expression.origin)
-              //extensionReceiver = null
             }
             extensionReceiver != null -> {
               proofCall.extensionReceiver = extensionReceiver
@@ -211,15 +212,50 @@ class ProofsIrCodegen(
               }
             }
           }
+          fixProofExpression(expression, proofCall)
+        } else {
+          expression
         }
       }
     }
+    return expression
   }
+
+  /**
+   * check ir/builders/declarationBuilders.kt#buildFun for reference
+   */
+  fun fixProofExpression(call: IrCall, access: IrMemberAccessExpression): IrCall =
+    irUtils.run {
+      val f = call.unsubstitutedDescriptor
+      val wr = WrappedSimpleFunctionDescriptor(f.annotations, f.source)
+      val fsymbol = pluginContext.symbolTable.referenceSimpleFunction(f)
+      val g = IrFunctionImpl(
+        startOffset = fsymbol.owner.startOffset,
+        endOffset = fsymbol.owner.endOffset,
+        origin = fsymbol.owner.origin,
+        symbol = IrSimpleFunctionSymbolImpl(wr),
+        name = f.name,
+        visibility = f.visibility,
+        modality = f.modality,
+        returnType = call.type,
+        isInline = f.isInline,
+        isExternal = f.isExternal,
+        isTailrec = f.isTailrec,
+        isSuspend = f.isSuspend,
+        isExpect = f.isExpect,
+        isOperator = f.isOperator,
+      )
+      wr.bind(g)
+      //val dss = call.transform(transformer(), null)
+      val s = call.transformMe(g, call.superQualifierSymbol)
+      //s.transform(transformer(), null)
+      return s
+    }
 
   private fun CompilerContext.insertGivenCall(
     givenUpperBound: GivenUpperBound,
     expression: IrCall
-  ): Unit {
+  ): IrCall {
     val upperBound = givenUpperBound.givenUpperBound
     if (upperBound != null) {
       givenUpperBound.givenValueParameters.forEach { (descriptor, superType) ->
@@ -229,6 +265,7 @@ class ProofsIrCodegen(
         }
       }
     }
+    return expression
   }
 
   fun CompilerContext.proveProperty(it: IrProperty): IrProperty? {
@@ -278,18 +315,6 @@ class ProofsIrCodegen(
       }
     } else it
   }
-
-  fun CompilerContext.proveSyntheticFunctions(f: IrValueParameter): IrValueParameter? =
-    f.apply {
-      println(ir2string(this))
-
-    }
-
-  fun CompilerContext.proveSyntheticAccess(f: IrFunction): IrFunction? =
-    f.apply {
-      println("\n \n PROOOF")
-      println(ir2string(this))
-    }
 
   companion object {
     operator fun <A> invoke(irUtils: IrUtils, f: ProofsIrCodegen.() -> A): A =

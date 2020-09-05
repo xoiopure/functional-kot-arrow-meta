@@ -180,7 +180,9 @@ fun Meta.provenSyntheticScope(): ExtensionPhase =
   )
 
 /**
- * invariant in org.jetbrains.kotlin.ir.symbols.impl.IrBindableSymbolBase
+ * Invariant:
+ * assert(isOriginalDescriptor(descriptor) && if (descriptor !is WrappedDeclarationDescriptor<*>)
+ *  descriptor.containingDeclaration == null || isOriginalDescriptor(descriptor.containingDeclaration) else true)
  */
 fun isOriginalDescriptor(descriptor: DeclarationDescriptor): Boolean =
   descriptor is WrappedDeclarationDescriptor<*> ||
