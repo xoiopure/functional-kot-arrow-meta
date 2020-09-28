@@ -34,7 +34,7 @@ class TypeClassesTest {
     }
 
   @Test
-  @Disabled
+  // @Disabled
   fun `polymorphic constrain`() {
     val codeSnippet = """
        import arrow.*
