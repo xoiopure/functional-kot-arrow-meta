@@ -45,7 +45,7 @@ subprojects { project ->
 configure(subprojects
         - project("docs")
 ) {
-  apply from: rootProject.file('gradle/publication.gradle')
+  apply from: "https://raw.githubusercontent.com/arrow-kt/arrow/master/gradle/publication.gradle"
 }
 
 // To run tests for Arrow Meta IDEA Plugin
@@ -67,9 +67,7 @@ task buildMeta {
   group = "Arrow Meta"
   description = "Assembles and tests"
   dependsOn ':compiler-plugin:build'
-  // 'build' task is not executed for :gradle-plugin because it depends on the publication of compiler-plugin 
-  // and it could fail when changing version
-  dependsOn ':gradle-plugin:jar'
+  dependsOn ':gradle-plugin:build'
   dependsOn ':publishIdeTestingDependencies'
   dependsOn ':idea-plugin:build'
   dependsOn ':meta-test:build'
@@ -80,7 +78,6 @@ task buildMeta {
 task publishMeta {
   dependsOn ':compiler-plugin:publishToMavenLocal'
   dependsOn ':gradle-plugin:publishToMavenLocal'
-  dependsOn ':idea-plugin:publishToMavenLocal'
   dependsOn ':meta-test:publishToMavenLocal'
   dependsOn ':prelude:publishToMavenLocal'
 }
@@ -90,9 +87,11 @@ task publishAndRunIde {
   description = "Publishes and runs IDE on local workspace"
   dependsOn ':cleanMeta'
   dependsOn ':publishMeta'
+  dependsOn ':idea-plugin:buildPlugin'
   dependsOn ':idea-plugin:runIde'
   tasks.findByPath(':publishMeta').mustRunAfter ':cleanMeta'
-  tasks.findByPath(':idea-plugin:runIde').mustRunAfter ':publishMeta'
+  tasks.findByPath(':idea-plugin:buildPlugin').mustRunAfter ':publishMeta'
+  tasks.findByPath(':idea-plugin:runIde').mustRunAfter ':idea-plugin:buildPlugin'
 }
 
 task generateDoc(type:Exec) {
@@ -122,8 +121,3 @@ task buildMetaDoc {
 
 configureValidation.mustRunAfter generateDoc
 runValidation.mustRunAfter configureValidation
-
-wrapper {
-  distributionType = Wrapper.DistributionType.ALL
-  gradleVersion = "$GRADLE_VERSION"
-}
